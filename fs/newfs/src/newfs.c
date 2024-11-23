@@ -15,7 +15,7 @@ static const struct fuse_opt option_spec[] = {		/* 用于FUSE文件系统解析�
 	FUSE_OPT_END
 };
 
-struct custom_options newfs_options;			 /* 全局选项 */
+extern struct custom_options nfs_options;			 /* 全局选项 */
 extern struct nfs_super      nfs_super; 
 /******************************************************************************
 * SECTION: FUSE操作定义
@@ -50,7 +50,7 @@ static struct fuse_operations operations = {
  */
 void* newfs_init(struct fuse_conn_info * conn_info) {
 	/* TODO: 在这里进行挂载 */
-	if (nfs_mount(newfs_options) != 0) {
+	if (nfs_mount(nfs_options) != 0) {
 		NFS_DBG("[%s] mount error\n", __func__);
 		fuse_exit(fuse_get_context()->fuse);
 		return NULL;
@@ -59,7 +59,7 @@ void* newfs_init(struct fuse_conn_info * conn_info) {
 	return NULL;
 
 	/* 下面是一个控制设备的示例 */
-	//super.fd = ddriver_open(newfs_options.device);
+	//super.fd = ddriver_open(nfs_options.device);
 }
 
 /**
@@ -387,9 +387,9 @@ int main(int argc, char **argv)
     int ret;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
-	newfs_options.device = strdup("TODO: 这里填写你的ddriver设备路径");
+	nfs_options.device = strdup("/home/Young/ddriver");
 
-	if (fuse_opt_parse(&args, &newfs_options, option_spec, NULL) == -1)
+	if (fuse_opt_parse(&args, &nfs_options, option_spec, NULL) == -1)
 		return -1;
 	
 	ret = fuse_main(args.argc, args.argv, &operations, NULL);

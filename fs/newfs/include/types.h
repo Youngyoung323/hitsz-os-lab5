@@ -63,6 +63,7 @@ typedef enum nfs_file_type {
 #define NFS_DISK_SZ()                   (nfs_super.sz_disk)  // 4MB
 #define NFS_DRIVER()                    (nfs_super.fd)
 #define NFS_BLKS_SZ(blks)               ((blks) * NFS_BLK_SZ())
+#define NFS_DENTRY_PER_BLK()            (NFS_BLK_SZ() / sizeof(struct nfs_dentry))
 
 // 向下取整以及向上取整
 #define NFS_ROUND_DOWN(value, round)    ((value) % (round) == 0 ? (value) : ((value) / (round)) * (round))
@@ -116,7 +117,7 @@ struct nfs_super {
 struct nfs_inode {
     /* TODO: Define yourself */
     uint32_t           ino;                               // 索引编号                         
-    int                size;                              // 文件占用空间(用了多少个逻辑块) 
+    int                size;                              // 文件占用空间
     int                link;                              // 连接数默认为1(不考虑软链接和硬链接)
     int                block_pointer[NFS_DATA_PER_FILE];  // 数据块索引
     int                dir_cnt;                           // 如果是目录型文件，则代表有几个目录项
@@ -124,6 +125,7 @@ struct nfs_inode {
     struct nfs_dentry  *dentrys;                          // 指向该inode的所有子dentry
     NFS_FILE_TYPE      ftype;                             // 文件类型
     uint8_t*           data[NFS_DATA_PER_FILE];           // 指向数据块的指针
+    int                block_allocted;                    // 已分配数据块数量
 };
 
 struct nfs_dentry {
@@ -176,6 +178,7 @@ struct nfs_inode_d {
     int                block_pointer[NFS_DATA_PER_FILE];  // 数据块索引
     int                dir_cnt;                           // 如果是目录型文件，则代表有几个目录项
     NFS_FILE_TYPE      ftype;                             // 文件类型
+    int                block_allocted;                    // 已分配数据块数量
 };
 
 struct nfs_dentry_d {

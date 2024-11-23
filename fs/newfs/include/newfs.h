@@ -36,6 +36,7 @@ int 			   nfs_umount();
 int 			   nfs_alloc_dentry(struct nfs_inode * inode, struct nfs_dentry * dentry);
 int 			   nfs_drop_dentry(struct nfs_inode * inode, struct nfs_dentry * dentry);
 struct nfs_inode*  nfs_alloc_inode(struct nfs_dentry * dentry);
+int                nfs_alloc_data();
 int 			   nfs_sync_inode(struct nfs_inode * inode);
 int 			   nfs_drop_inode(struct nfs_inode * inode);
 struct nfs_inode*  nfs_read_inode(struct nfs_dentry * dentry, int ino);

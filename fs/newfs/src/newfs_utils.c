@@ -120,6 +120,13 @@ int nfs_alloc_dentry(struct nfs_inode* inode, struct nfs_dentry* dentry) {
         inode->dentrys = dentry;
     }
     inode->dir_cnt++;
+    inode->size += sizeof(struct nfs_dentry);
+
+    // 判断是否需要重新分配一个数据块
+    if (inode->dir_cnt % NFS_DENTRY_PER_BLK() == 1) {
+        inode->block_pointer[inode->block_allocted] = nfs_alloc_data();
+        inode->block_allocted++;
+    }
     return inode->dir_cnt;
 }
 
@@ -134,10 +141,7 @@ struct nfs_inode* nfs_alloc_inode(struct nfs_dentry * dentry) {
     int byte_cursor   = 0; 
     int bit_cursor    = 0; 
     int ino_cursor    = 0;  
-    int dno_cursor    = 0;  
-    int data_blks_num = 0;
-    boolean is_find_free_entry    = FALSE;
-    boolean is_find_enough_entry = FALSE;
+    boolean is_find_free_entry   = FALSE;
 
     inode = (struct nfs_inode*)malloc(sizeof(struct nfs_inode));
 
@@ -159,14 +163,14 @@ struct nfs_inode* nfs_alloc_inode(struct nfs_dentry * dentry) {
         }
     }
 
-    // 先按字节寻找空闲的inode位图
+    /*// 先按字节寻找空闲的inode位图
     for (byte_cursor = 0; byte_cursor < NFS_BLKS_SZ(nfs_super.map_inode_blks); byte_cursor++)
     {
         // 再在该字节中遍历8个bit寻找空闲的inode位图
         for (bit_cursor = 0; bit_cursor < UINT8_BITS; bit_cursor++) {
-            if((nfs_super.map_inode[byte_cursor] & (0x1 << bit_cursor)) == 0) {    
+            if((nfs_super.map_data[byte_cursor] & (0x1 << bit_cursor)) == 0) {    
                 // 当前dno_cursor位置空闲 
-                nfs_super.map_inode[byte_cursor] |= (0x1 << bit_cursor);
+                nfs_super.map_data[byte_cursor] |= (0x1 << bit_cursor);
                 inode->block_pointer[data_blks_num++] = dno_cursor;
                 // 分配完足够数量的位图再退出
                 if (data_blks_num == NFS_DATA_PER_FILE) {
@@ -179,19 +183,20 @@ struct nfs_inode* nfs_alloc_inode(struct nfs_dentry * dentry) {
         if (is_find_enough_entry) {
             break;
         }
-    }
+    }*/
+
+    // 上面的实现有问题,应该是预先分配一个数据块,等到这个数据块不够用的时候再分配新的数据块
+    // 具体实现应该放在alloc_dentry中，新建一个alloc_data函数辅助实现
 
     // 未找到空闲结点
-    if (!is_find_free_entry || ino_cursor == nfs_super.max_ino)
-        return -NFS_ERROR_NOSPACE;
-
-    if (!is_find_enough_entry || dno_cursor == nfs_super.max_dno)
+    if (!is_find_free_entry || ino_cursor >= nfs_super.max_ino)
         return -NFS_ERROR_NOSPACE;
 
     // 为目录项分配inode节点
     inode->ino  = ino_cursor; 
     inode->size = 0;
     inode->dir_cnt = 0;
+    inode->block_allocted = 0;
     inode->dentrys = NULL;
 
     // dentry指向分配的inode 
@@ -200,15 +205,48 @@ struct nfs_inode* nfs_alloc_inode(struct nfs_dentry * dentry) {
     // inode指回dentry 
     inode->dentry = dentry;
     
-    // 文件类型需要分配空间,目录项已经在dentrys里
+    // 文件类型需要分配空间,目录项已经在dentrys里,普通文件不要求额外分配数据块的操作,一次性分配完就好了
     if (NFS_IS_REG(inode)) {
-        for(int i=0; i<NFS_DATA_PER_FILE; i++){
+        for (int i = 0; i < NFS_DATA_PER_FILE; i++) {
             inode->data[i] = (uint8_t *)malloc(NFS_BLK_SZ());
         }
     }
 
     return inode;
 }
+
+/**
+ * @brief 额外分配一个数据块
+ * @return 分配的数据块号
+ */
+ int nfs_alloc_data() {
+    int byte_cursor       = 0; 
+    int bit_cursor        = 0;   
+    int dno_cursor        = 0; 
+    int is_find_free_data = 0;
+
+    for (byte_cursor = 0; byte_cursor < NFS_BLKS_SZ(nfs_super.map_data_blks); byte_cursor++) {
+        // 再在该字节中遍历8个bit寻找空闲的inode位图
+        for (bit_cursor = 0; bit_cursor < UINT8_BITS; bit_cursor++) {
+            if((nfs_super.map_data[byte_cursor] & (0x1 << bit_cursor)) == 0) {
+                // 当前dno_cursor位置空闲
+                nfs_super.map_data[byte_cursor] |= (0x1 << bit_cursor);
+                is_find_free_data = 1;
+                break;
+            }
+            dno_cursor++;
+        }
+        if (is_find_free_data) {
+            break;
+        }
+    }
+
+    if (!is_find_free_data || dno_cursor >= nfs_super.max_dno) {
+        return -NFS_ERROR_NOSPACE;
+    }
+
+    return dno_cursor;
+ }
 
 /**
  * @brief 将内存inode及其下方结构全部刷回磁盘
@@ -224,10 +262,11 @@ int nfs_sync_inode(struct nfs_inode * inode) {
     int ino             = inode->ino;
 
     // 把inode的内容拷贝到inode_d中
-    inode_d.ino         = ino;
-    inode_d.size        = inode->size;
-    inode_d.ftype       = inode->dentry->ftype;
-    inode_d.dir_cnt     = inode->dir_cnt;
+    inode_d.ino            = ino;
+    inode_d.size           = inode->size;
+    inode_d.ftype          = inode->dentry->ftype;
+    inode_d.dir_cnt        = inode->dir_cnt;
+    inode_d.block_allocted = inode->block_allocted;
     for (int i = 0; i < NFS_DATA_PER_FILE; i++) {
         inode_d.block_pointer[i] = inode->block_pointer[i];
     }
@@ -244,7 +283,7 @@ int nfs_sync_inode(struct nfs_inode * inode) {
         dentry_cursor     = inode->dentrys;
         int data_blks_num = 0;
         // 要将dentry的内容刷回磁盘，有七个数据块
-        while ((dentry_cursor != NULL) && (data_blks_num < NFS_DATA_PER_FILE)) {
+        while ((dentry_cursor != NULL) && (data_blks_num < inode->block_allocted)) {
             offset = NFS_DATA_OFS(inode->block_pointer[data_blks_num]);
             while ((dentry_cursor != NULL) && (offset + sizeof(struct nfs_dentry_d) < NFS_DATA_OFS(inode->block_pointer[data_blks_num] + 1))) {
                 // dentry的内容复制到dentry_d中
@@ -270,7 +309,7 @@ int nfs_sync_inode(struct nfs_inode * inode) {
     }
     // 如果当前inode是文件，那么数据是文件内容，直接写即可 
     else if (NFS_IS_REG(inode)) { 
-        for (int i = 0; i < NFS_DATA_PER_FILE; i++) {
+        for (int i = 0; i < inode->block_allocted; i++) {
             if (nfs_driver_write(NFS_DATA_OFS(inode->block_pointer[i]), inode->data[i], NFS_BLKS_SZ(NFS_DATA_PER_FILE)) != NFS_ERROR_NONE) {
                 NFS_DBG("[%s] io error\n", __func__);
                 return -NFS_ERROR_IO;
@@ -307,6 +346,7 @@ struct nfs_inode* nfs_read_inode(struct nfs_dentry * dentry, int ino) {
     inode->size = inode_d.size;
     inode->dentry = dentry;
     inode->dentrys = NULL;
+    inode->block_allocted = inode_d.block_allocted;
     for (int i = 0; i < NFS_DATA_PER_FILE; i++) {
         inode->block_pointer[i] = inode_d.block_pointer[i];
     }

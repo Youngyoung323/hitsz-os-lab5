@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/home/students/220110805/user-land-filesystem/fs/newfs/build",
+  "command": "/usr/bin/gcc  -I/home/students/220110805/user-land-filesystem/fs/newfs/./include  -D_FILE_OFFSET_BITS=64 -no-pie -g -Wall --pedantic -g -o CMakeFiles/newfs.dir/src/newfs.c.o -c /home/students/220110805/user-land-filesystem/fs/newfs/src/newfs.c",
+  "file": "/home/students/220110805/user-land-filesystem/fs/newfs/src/newfs.c"
+},
+{
+  "directory": "/home/students/220110805/user-land-filesystem/fs/newfs/build",
+  "command": "/usr/bin/gcc  -I/home/students/220110805/user-land-filesystem/fs/newfs/./include  -D_FILE_OFFSET_BITS=64 -no-pie -g -Wall --pedantic -g -o CMakeFiles/newfs.dir/src/newfs_debug.c.o -c /home/students/220110805/user-land-filesystem/fs/newfs/src/newfs_debug.c",
+  "file": "/home/students/220110805/user-land-filesystem/fs/newfs/src/newfs_debug.c"
+},
+{
+  "directory": "/home/students/220110805/user-land-filesystem/fs/newfs/build",
+  "command": "/usr/bin/gcc  -I/home/students/220110805/user-land-filesystem/fs/newfs/./include  -D_FILE_OFFSET_BITS=64 -no-pie -g -Wall --pedantic -g -o CMakeFiles/newfs.dir/src/newfs_utils.c.o -c /home/students/220110805/user-land-filesystem/fs/newfs/src/newfs_utils.c",
+  "file": "/home/students/220110805/user-land-filesystem/fs/newfs/src/newfs_utils.c"
+}
+]

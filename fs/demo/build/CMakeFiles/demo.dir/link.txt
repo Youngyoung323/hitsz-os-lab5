@@ -1,0 +1,1 @@
+/usr/bin/gcc  -D_FILE_OFFSET_BITS=64 -no-pie -g -Wall --pedantic -g -rdynamic CMakeFiles/demo.dir/src/main.c.o -o demo  -lfuse /home/students/220110805/lib/libddriver.a 

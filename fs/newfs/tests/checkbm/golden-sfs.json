@@ -1,0 +1,7 @@
+{
+    "checks": [
+        "super",
+        "inode_map"
+    ],
+    "valid_inode": 2
+}

@@ -192,7 +192,7 @@ struct nfs_inode* nfs_alloc_inode(struct nfs_dentry * dentry) {
     if (!is_find_free_entry || ino_cursor >= nfs_super.max_ino)
         return -NFS_ERROR_NOSPACE;
 
-    // 为目录项分配inode节点
+    // 为目录项分配inode节点并初始化相关属性
     inode->ino  = ino_cursor; 
     inode->size = 0;
     inode->dir_cnt = 0;
@@ -282,7 +282,7 @@ int nfs_sync_inode(struct nfs_inode * inode) {
     if (NFS_IS_DIR(inode)) { // 如果当前inode是目录，那么数据是目录项，且目录项的inode也要写回                         
         dentry_cursor     = inode->dentrys;
         int data_blks_num = 0;
-        // 要将dentry的内容刷回磁盘，有七个数据块
+        // 要将dentry的内容刷回磁盘，目录有block_allocted个数据块
         while ((dentry_cursor != NULL) && (data_blks_num < inode->block_allocted)) {
             offset = NFS_DATA_OFS(inode->block_pointer[data_blks_num]);
             while ((dentry_cursor != NULL) && (offset + sizeof(struct nfs_dentry_d) < NFS_DATA_OFS(inode->block_pointer[data_blks_num] + 1))) {
@@ -309,6 +309,9 @@ int nfs_sync_inode(struct nfs_inode * inode) {
     }
     // 如果当前inode是文件，那么数据是文件内容，直接写即可 
     else if (NFS_IS_REG(inode)) { 
+        // 这里也要保证i < inode->block_allocted
+        // 必做并不需要实现普通文件的write操作，虽然我们前面在alloc_node中为普通文件申请了数据块内存
+        // 但我们并没有为其申请对应的数据位图，所以这里不需要写回去
         for (int i = 0; i < inode->block_allocted; i++) {
             if (nfs_driver_write(NFS_DATA_OFS(inode->block_pointer[i]), inode->data[i], NFS_BLKS_SZ(NFS_DATA_PER_FILE)) != NFS_ERROR_NONE) {
                 NFS_DBG("[%s] io error\n", __func__);
@@ -559,7 +562,7 @@ int nfs_mount(struct custom_options options){
     // 新建根目录
     root_dentry = new_dentry("/", NFS_DIR);
 
-    // 读取磁盘超级块内容1
+    // 读取磁盘超级块内容
     if (nfs_driver_read(NFS_SUPER_OFS, (uint8_t *)(&nfs_super_d), sizeof(struct nfs_super_d)) != NFS_ERROR_NONE) {
         return -NFS_ERROR_IO;
     }   
@@ -594,13 +597,13 @@ int nfs_mount(struct custom_options options){
     // 初始化超级块
     nfs_super.sz_usage   = nfs_super_d.sz_usage; 
 
-    // 建立inode位图    
+    // 建立索引位图    
     nfs_super.map_inode         = (uint8_t *)malloc(NFS_BLKS_SZ(nfs_super_d.map_inode_blks));
     nfs_super.map_inode_blks    = nfs_super_d.map_inode_blks;
     nfs_super.map_inode_offset  = nfs_super_d.map_inode_offset;
     nfs_super.inode_offset      = nfs_super_d.inode_offset;
 
-    // 建立数据块位图
+    // 建立数据位图
     nfs_super.map_data          = (uint8_t *)malloc(NFS_BLKS_SZ(nfs_super_d.map_data_blks));
     nfs_super.map_data_blks     = nfs_super_d.map_data_blks;
     nfs_super.map_data_offset   = nfs_super_d.map_data_offset;
